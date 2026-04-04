@@ -31,10 +31,19 @@ def load_personal_data(directory: str) -> str:
     return "\n<|endoftext|>\n".join(texts)
 
 
-def load_hf_dataset(dataset_name: str, split: str = "train", text_column: str = "text") -> str:
+def load_hf_dataset(dataset_name: str, split: str = "train", text_column: str = "text", max_examples: int = None) -> str:
     from datasets import load_dataset
-    ds = load_dataset(dataset_name, split=split)
-    return "\n<|endoftext|>\n".join(ds[text_column])
+    if max_examples is not None:
+        ds = load_dataset(dataset_name, split=split, streaming=True)
+        texts = []
+        for i, example in enumerate(ds):
+            if i >= max_examples:
+                break
+            texts.append(example[text_column])
+    else:
+        ds = load_dataset(dataset_name, split=split)
+        texts = list(ds[text_column])
+    return "\n<|endoftext|>\n".join(texts)
 
 
 def build_dataset(
@@ -42,13 +51,16 @@ def build_dataset(
     context_length: int,
     personal_dir: str = None,
     hf_dataset_name: str = None,
+    hf_split: str = "train",
+    hf_text_column: str = "text",
+    hf_max_examples: int = None,
     personal_weight: float = 0.25,
 ) -> TextDataset:
 
     texts = []
 
     if hf_dataset_name:
-        hf_text = load_hf_dataset(hf_dataset_name)
+        hf_text = load_hf_dataset(hf_dataset_name, split=hf_split, text_column=hf_text_column, max_examples=hf_max_examples)
         texts.append(hf_text)
 
     if personal_dir:

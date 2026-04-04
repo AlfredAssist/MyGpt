@@ -83,17 +83,29 @@ def train(model, train_loader, val_loader, optimizer, device):
 if __name__ == "__main__":
     print(f"Using device: {DEVICE}")
 
-    # 1. Load or train tokenizer
-    tok = BPETokenizer(vocab_size=VOCAB_SIZE)
-    # TODO: replace this sample text with your real data path
-    tok.train("the quick brown fox jumps over the lazy dog " * 500)
+    # 1. Stream a sample of Gutenberg books to train the tokenizer on real vocabulary
+    print("Loading tokenizer sample from Gutenberg (streaming)...")
+    from datasets import load_dataset
+    tok_sample_texts = []
+    for i, ex in enumerate(load_dataset("manu/project_gutenberg", split="en", streaming=True)):
+        if i >= 20:
+            break
+        tok_sample_texts.append(ex["text"])
+    tok_sample_text = "\n".join(tok_sample_texts)
 
-    # 2. Build dataset — swap in your personal_dir and hf_dataset_name
+    tok = BPETokenizer(vocab_size=VOCAB_SIZE)
+    tok.train(tok_sample_text)
+    print("Tokenizer trained.")
+
+    # 2. Build dataset — stream 300 Gutenberg books, formal Victorian/Edwardian prose
+    print("Loading dataset (streaming)...")
     dataset = build_dataset(
         tokenizer=tok,
         context_length=CONTEXT_LEN,
-        hf_dataset_name=None,       # e.g. "roneneldan/TinyStories"
-        personal_dir=None,          # e.g. "/path/to/your/notes"
+        hf_dataset_name="manu/project_gutenberg",
+        hf_split="en",
+        hf_text_column="text",
+        hf_max_examples=300,
     )
     print(f"Dataset size: {len(dataset):,} windows")
 
