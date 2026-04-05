@@ -72,6 +72,7 @@ def build_dataset(
         texts.append(personal_text * repeats)
 
     full_text = "\n<|endoftext|>\n".join(texts)
+    print(f"Encoding {len(full_text):,} characters — this takes a few minutes...", flush=True)
     token_ids = tokenizer.encode(full_text)
     return TextDataset(token_ids, context_length)
 

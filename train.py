@@ -103,7 +103,7 @@ if __name__ == "__main__":
         hf_dataset_name="manu/project_gutenberg",
         hf_split="en",
         hf_text_column="text",
-        hf_max_examples=300,
+        hf_max_examples=10,
     )
     print(f"Dataset size: {len(dataset):,} windows")
 
