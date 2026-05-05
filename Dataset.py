@@ -31,43 +31,58 @@ def load_personal_data(directory: str) -> str:
     return "\n<|endoftext|>\n".join(texts)
 
 
-def load_hf_dataset_texts(dataset_name: str, split: str = "train", text_column: str = "text", max_examples: int = None) -> list[str]:
-    # Returns a list of individual texts rather than one big string — so we can encode each separately
+def load_hf_dataset_texts(dataset_name: str, split: str = "train", text_column: str = "text",
+                           max_examples: int = None, min_chars: int = 0, template: str = None) -> list[str]:
+    # template: optional format string using column names e.g. "Human: {instruction}\nAssistant: {response}\n"
+    # If None, uses text_column directly.
     from datasets import load_dataset
-    if max_examples is not None:
-        ds = load_dataset(dataset_name, split=split, streaming=True)
-        texts = []
-        for i, example in enumerate(ds):
-            if i >= max_examples:
-                break
-            texts.append(example[text_column][:200_000])
-    else:
-        ds = load_dataset(dataset_name, split=split)
-        texts = list(ds[text_column])
+    ds = load_dataset(dataset_name, split=split, streaming=True)
+    texts = []
+    scanned = 0
+    for example in ds:
+        text = template.format(**example) if template else example[text_column]
+        scanned += 1
+        if len(text) < min_chars:
+            continue
+        texts.append(text[:200_000])
+        if max_examples is not None and len(texts) >= max_examples:
+            break
+    print(f"  Scanned {scanned}, kept {len(texts)}")
     return texts
 
 
 def build_dataset(
     tokenizer: BPETokenizer,
     context_length: int,
+    sources: list = None,
     personal_dir: str = None,
-    hf_dataset_name: str = None,
-    hf_split: str = "train",
-    hf_text_column: str = "text",
-    hf_max_examples: int = None,
 ) -> TextDataset:
-
+    """
+    sources: list of dicts, each with keys:
+        dataset  - HuggingFace dataset name
+        split    - e.g. "train"
+        column   - text column name
+        max      - max number of examples to load
+        min_chars - minimum character length to keep (filters short texts)
+    """
     all_texts = []
 
-    if hf_dataset_name:
-        all_texts += load_hf_dataset_texts(hf_dataset_name, split=hf_split, text_column=hf_text_column, max_examples=hf_max_examples)
+    for src in (sources or []):
+        print(f"\nLoading {src['dataset']} ({src.get('max', 'all')} examples)...")
+        all_texts += load_hf_dataset_texts(
+            src["dataset"],
+            split=src.get("split", "train"),
+            text_column=src.get("column", "text"),
+            max_examples=src.get("max"),
+            min_chars=src.get("min_chars", 0),
+            template=src.get("template"),
+        )
 
     if personal_dir:
-        personal_text = load_personal_data(personal_dir)
-        all_texts.append(personal_text)
+        all_texts.append(load_personal_data(personal_dir))
 
     # Encode each text separately — much faster than one giant string
-    print(f"Encoding {len(all_texts)} texts...", flush=True)
+    print(f"\nEncoding {len(all_texts)} texts...", flush=True)
     token_ids = []
     for i, text in enumerate(all_texts):
         print(f"  [{i+1}/{len(all_texts)}] {len(text):,} chars", flush=True)

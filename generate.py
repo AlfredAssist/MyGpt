@@ -50,7 +50,7 @@ if __name__ == "__main__":
     tok.load("tokenizer.json")
 
     # Load model
-    checkpoint = torch.load("checkpoint.pt", map_location=device)
+    checkpoint = torch.load("checkpoint.pt", map_location=device, weights_only=False)
     cfg   = checkpoint["config"]
     model = GPT(**cfg).to(device)
     model.load_state_dict(checkpoint["model"])
